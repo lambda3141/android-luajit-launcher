@@ -2626,6 +2626,62 @@ local function run(android_app_state)
         end)
     end
 
+    -- display cutout (notch, camera hole)
+    android.cutout = {
+        --- Does the display have a cutout?
+        -- @treturn bool
+        exists = function()
+            return JNI:context(android.app.activity.vm, function(jni)
+                return jni:callBooleanMethod(
+                    android.app.activity.clazz,
+                    "hasDisplayCutout",
+                    "()Z"
+                )
+            end)
+        end,
+        --- Is the window set to extend into the cutout area on next start?
+        -- @treturn bool
+        isUsed = function()
+            return JNI:context(android.app.activity.vm, function(jni)
+                return jni:callBooleanMethod(
+                    android.app.activity.clazz,
+                    "isDisplayCutoutUsed",
+                    "()Z"
+                )
+            end)
+        end,
+        --- Extends the window into the cutout area, or not. Takes effect on next start.
+        -- @bool enabled
+        setUsed = function(enabled)
+            JNI:context(android.app.activity.vm, function(jni)
+                jni:callVoidMethod(
+                    android.app.activity.clazz,
+                    "setDisplayCutoutUsed",
+                    "(Z)V",
+                    ffi.new("bool", enabled and true or false)
+                )
+            end)
+        end,
+        --- Gets the safe insets around the cutout, for the current rotation.
+        -- All zeros unless the window extends into the cutout area.
+        -- @treturn int left, top, right, bottom (in pixels)
+        getInsets = function()
+            return JNI:context(android.app.activity.vm, function(jni)
+                local insets = jni:callObjectMethod(
+                    android.app.activity.clazz,
+                    "getDisplayCutoutInsets",
+                    "()Ljava/lang/String;"
+                )
+                local left, top, right, bottom = string.match(
+                    jni:to_string(insets),
+                    "(%d+);(%d+);(%d+);(%d+)"
+                )
+                return tonumber(left) or 0, tonumber(top) or 0,
+                    tonumber(right) or 0, tonumber(bottom) or 0
+            end)
+        end,
+    }
+
     local function subprocess(jni, argv)
         local args_array = jni.env[0].NewObjectArray(jni.env, #argv,
             jni.env[0].FindClass(jni.env, "java/lang/String"), nil)

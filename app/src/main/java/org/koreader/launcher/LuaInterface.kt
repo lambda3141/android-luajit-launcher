@@ -19,6 +19,7 @@ interface LuaInterface {
     fun getBatteryLevel(): Int
     fun getClipboardText(): String
     fun getDeviceProperties(): String
+    fun getDisplayCutoutInsets(): String
     fun getEinkConstants(): String
     fun getEinkPlatform(): String
     fun getExternalPath(): String
@@ -46,6 +47,7 @@ interface LuaInterface {
     fun hasBrokenLifecycle(): Boolean
     fun hasBrokenTouchReport(): Boolean
     fun hasClipboardText(): Boolean
+    fun hasDisplayCutout(): Boolean
     fun hasLights(): Boolean
     fun hasNativeRotation(): Boolean
     fun hasOTAUpdates(): Boolean
@@ -56,6 +58,7 @@ interface LuaInterface {
     fun isChromeOS(): Boolean
     fun isColorScreen(): Boolean
     fun isDebuggable(): Boolean
+    fun isDisplayCutoutUsed(): Boolean
     fun isEink(): Boolean
     fun isEinkFull(): Boolean
     fun isFullscreen(): Boolean
@@ -72,6 +75,7 @@ interface LuaInterface {
     fun requestWriteSystemSettings(rationale: String, okButton: String, cancelButton: String)
     fun safFilePicker(path: String?): Boolean
     fun sendText(text: String, reason: String? = null, title: String? = null, mimetype: String? = null)
+    fun setDisplayCutoutUsed(enabled: Boolean)
     fun setFullscreen(enabled: Boolean)
     fun setClipboardText(text: String)
     fun setIgnoreInput(enabled: Boolean)

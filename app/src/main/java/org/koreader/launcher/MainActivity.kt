@@ -48,6 +48,10 @@ class MainActivity : NativeActivity(), LuaInterface,
     // Device cutout - only used on API 28+
     private var topInsetHeight: Int = 0
 
+    // Window extends into the display cutout area (notch, camera hole) - only used on API 28+.
+    // Read from preferences once, on activity creation. Changing it requires a restart.
+    private var extendIntoCutout: Boolean = false
+
     // Fullscreen - only used on API levels 16-18
     private var fullscreen: Boolean = true
 
@@ -71,6 +75,7 @@ class MainActivity : NativeActivity(), LuaInterface,
         private const val TAG_SURFACE = "Surface"
         private const val MANDATORY_PERMISSIONS_ID = 1
         private const val ACTION_SAF_FILEPICKER_ID = 2
+        private const val PREF_EXTEND_INTO_CUTOUT = "extend_into_cutout"
         private val BATTERY_FILTER = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
 
         @JvmStatic
@@ -113,6 +118,8 @@ class MainActivity : NativeActivity(), LuaInterface,
         lightDialog = LightDialog()
 
         setTheme(R.style.Fullscreen)
+
+        extendIntoCutout = applyCutoutMode()
 
         // Window background must be black for vertical and horizontal lines to be visible
         window.setBackgroundDrawableResource(android.R.color.black)
@@ -379,6 +386,16 @@ class MainActivity : NativeActivity(), LuaInterface,
         }
     }
 
+    override fun getDisplayCutoutInsets(): String {
+        // Insets are only meaningful when our window overlaps the cutout.
+        val cutout = if (extendIntoCutout) getDisplayCutout() else null
+        return String.format(Locale.US, "%d;%d;%d;%d",
+            cutout?.safeInsetLeft ?: 0,
+            cutout?.safeInsetTop ?: 0,
+            cutout?.safeInsetRight ?: 0,
+            cutout?.safeInsetBottom ?: 0)
+    }
+
     override fun getDeviceProperties(): String {
         return device.properties
     }
@@ -455,7 +472,10 @@ class MainActivity : NativeActivity(), LuaInterface,
     }
 
     override fun getScreenHeight(): Int {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        return if (extendIntoCutout) {
+            // The window covers the whole display, cutout included. Lua keeps the UI out of it.
+            getHeight()
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             // We need to handle the notch in Portrait
             // NOTE: getScreenAvailableHeight does it automatically, but it also excludes the nav bar, when there's one :/
             if (getOrientationCompat(screenIsLandscape).and(1) == 0) {
@@ -494,7 +514,9 @@ class MainActivity : NativeActivity(), LuaInterface,
     }
 
     override fun getScreenWidth(): Int {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        return if (extendIntoCutout) {
+            getWidth()
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             // We need to handle the notch in Landscape
             // NOTE: getScreenAvailableWidth does it automatically, but it also excludes the nav bar, when there's one :/
             if (getOrientationCompat(screenIsLandscape).and(1) == 1) {
@@ -529,6 +551,10 @@ class MainActivity : NativeActivity(), LuaInterface,
         return clipboard.primaryClip?.let {
             (it.itemCount > 0)
         }?: false
+    }
+
+    override fun hasDisplayCutout(): Boolean {
+        return (topInsetHeight > 0) || (getDisplayCutout() != null)
     }
 
     override fun hasLights(): Boolean {
@@ -575,6 +601,10 @@ class MainActivity : NativeActivity(), LuaInterface,
 
     override fun isDebuggable(): Boolean {
         return MainApp.is_debug
+    }
+
+    override fun isDisplayCutoutUsed(): Boolean {
+        return getPreferences(Context.MODE_PRIVATE).getBoolean(PREF_EXTEND_INTO_CUTOUT, false)
     }
 
     override fun isEink(): Boolean {
@@ -701,6 +731,11 @@ class MainActivity : NativeActivity(), LuaInterface,
         }
     }
 
+    override fun setDisplayCutoutUsed(enabled: Boolean) {
+        // Applied on next start, see applyCutoutMode()
+        getPreferences(Context.MODE_PRIVATE).edit().putBoolean(PREF_EXTEND_INTO_CUTOUT, enabled).apply()
+    }
+
     override fun setFullscreen(enabled: Boolean) {
         if (Build.VERSION.SDK_INT == Build.VERSION_CODES.JELLY_BEAN_MR2) {
             fullscreen = enabled
@@ -754,6 +789,37 @@ class MainActivity : NativeActivity(), LuaInterface,
     /*---------------------------------------------------------------
      *                       private methods                        *
      *--------------------------------------------------------------*/
+
+    /* Lets the window extend into the display cutout area when the user asked for it.
+     * Without this (LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT), Android keeps a fullscreen window
+     * out of the cutout area and fills that area with black, which we can't draw on. */
+    @Suppress("NewApi")
+    private fun applyCutoutMode(): Boolean {
+        if (!MainApp.isAtLeastApi(Build.VERSION_CODES.P)) return false
+        if (!isDisplayCutoutUsed()) return false
+        window.attributes = window.attributes.apply {
+            layoutInDisplayCutoutMode = if (MainApp.isAtLeastApi(Build.VERSION_CODES.R)) {
+                // Cutouts on any edge, in any rotation
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+            } else {
+                // Cutouts on the short edges, which is where phones have them
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
+        }
+        Log.i(TAG_SURFACE, "window extends into the display cutout area")
+        return true
+    }
+
+    /* The display cutout for the current rotation, if any */
+    @Suppress("DEPRECATION", "NewApi")
+    private fun getDisplayCutout(): DisplayCutout? {
+        return when {
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> display?.cutout
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q -> windowManager.defaultDisplay.cutout
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.P -> window.decorView.rootWindowInsets?.displayCutout
+            else -> null
+        }
+    }
 
     private fun drawSplashScreen(holder: SurfaceHolder) {
         if (splashScreen) {
