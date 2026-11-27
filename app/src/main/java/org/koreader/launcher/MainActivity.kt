@@ -396,6 +396,14 @@ class MainActivity : NativeActivity(), LuaInterface,
             cutout?.safeInsetBottom ?: 0)
     }
 
+    override fun getDisplayCutoutRects(): String {
+        // The cutouts themselves (camera holes, notches), as "left,top,right,bottom;..."
+        val cutout = if (extendIntoCutout) getDisplayCutout() else null
+        return cutout?.boundingRects?.joinToString(";") { rect ->
+            String.format(Locale.US, "%d,%d,%d,%d", rect.left, rect.top, rect.right, rect.bottom)
+        } ?: ""
+    }
+
     override fun getDeviceProperties(): String {
         return device.properties
     }

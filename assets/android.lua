@@ -2680,6 +2680,24 @@ local function run(android_app_state)
                     tonumber(right) or 0, tonumber(bottom) or 0
             end)
         end,
+        --- Gets the bounding rectangles of the cutouts themselves (camera holes, notches),
+        -- for the current rotation. Empty unless the window extends into the cutout area.
+        -- @treturn table array of {x, y, w, h} tables (in pixels)
+        getRects = function()
+            local rects = {}
+            local str = JNI:context(android.app.activity.vm, function(jni)
+                return jni:to_string(jni:callObjectMethod(
+                    android.app.activity.clazz,
+                    "getDisplayCutoutRects",
+                    "()Ljava/lang/String;"
+                ))
+            end)
+            for left, top, right, bottom in (str or ""):gmatch("(%-?%d+),(%-?%d+),(%-?%d+),(%-?%d+)") do
+                left, top, right, bottom = tonumber(left), tonumber(top), tonumber(right), tonumber(bottom)
+                table.insert(rects, { x = left, y = top, w = right - left, h = bottom - top })
+            end
+            return rects
+        end,
     }
 
     local function subprocess(jni, argv)

@@ -20,6 +20,7 @@ interface LuaInterface {
     fun getClipboardText(): String
     fun getDeviceProperties(): String
     fun getDisplayCutoutInsets(): String
+    fun getDisplayCutoutRects(): String
     fun getEinkConstants(): String
     fun getEinkPlatform(): String
     fun getExternalPath(): String
